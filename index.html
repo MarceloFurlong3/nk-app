@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1f3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NK Distribuciones">
+<title>NK Distribuciones</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root {
+    --dark:#0f1f3d; --blue:#1d4ed8; --accent:#0ea5e9;
+    --gray:#f1f5f9; --gray2:#e2e8f0; --text:#1e293b; --muted:#64748b;
+    --green:#16a34a; --nav-h:64px;
+  }
+  html, body { height:100%; font-family:'Barlow',sans-serif; background:var(--gray); }
+
+  /* ── CONFIG BANNER ── */
+  #config-banner {
+    background:#fef9c3; border-bottom:2px solid #fbbf24;
+    padding:10px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  #config-banner span { font-size:11px; font-weight:600; color:#92400e; white-space:nowrap; }
+  #config-banner input {
+    flex:1; min-width:180px; border:1.5px solid #fbbf24; border-radius:4px;
+    padding:5px 10px; font-family:'Barlow',sans-serif; font-size:11px; outline:none;
+  }
+  #config-banner input:focus { border-color:var(--blue); }
+  #config-banner button {
+    background:#d97706; color:white; border:none; border-radius:4px;
+    padding:6px 14px; font-family:'Barlow',sans-serif; font-size:11px;
+    font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  #config-banner button:hover { background:#b45309; }
+  .status-dot {
+    width:10px; height:10px; border-radius:50%; background:#fbbf24;
+    flex-shrink:0; transition:background 0.3s;
+  }
+  .status-dot.ok  { background:var(--green); }
+  .status-dot.err { background:#dc2626; }
+
+  /* ── CONTENEDOR PRINCIPAL ── */
+  #app {
+    height:calc(100vh - var(--nav-h));
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  /* ── VISTAS ── */
+  .vista { display:none; }
+  .vista.activa { display:block; }
+
+  /* ── BOTTOM NAV ── */
+  #bottom-nav {
+    position:fixed; bottom:0; left:0; right:0;
+    height:var(--nav-h);
+    background:var(--dark);
+    display:flex;
+    border-top:1px solid rgba(255,255,255,0.08);
+    padding-bottom:env(safe-area-inset-bottom);
+    z-index:100;
+  }
+  .nav-btn {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:4px; background:none; border:none;
+    color:rgba(255,255,255,0.4); cursor:pointer;
+    transition:color 0.2s; padding:8px 0;
+    font-family:'Barlow',sans-serif;
+  }
+  .nav-btn:hover { color:rgba(255,255,255,0.7); }
+  .nav-btn.activo { color:var(--accent); }
+  .nav-btn .nav-icon { font-size:22px; line-height:1; }
+  .nav-btn .nav-label { font-size:10px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; }
+  .nav-btn.activo .nav-label { color:var(--accent); }
+
+  /* ── LOADING ── */
+  #loading {
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:center; height:100%; gap:12px;
+    color:var(--muted); font-size:13px; font-weight:600;
+  }
+  .spinner {
+    width:32px; height:32px; border:3px solid var(--gray2);
+    border-top-color:var(--blue); border-radius:50%;
+    animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- CONFIG -->
+<div id="config-banner">
+  <div class="status-dot" id="status-dot"></div>
+  <span>URL Apps Script:</span>
+  <input type="text" id="sheet-url" placeholder="Pegá la URL del Apps Script...">
+  <button onclick="guardarURL()">Guardar y conectar</button>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="loading">
+    <div class="spinner"></div>
+    <span>Cargando...</span>
+  </div>
+  <div id="vista-remito"  class="vista"></div>
+  <div id="vista-editor"  class="vista"></div>
+  <div id="vista-panel"   class="vista"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav id="bottom-nav">
+  <button class="nav-btn activo" id="nav-remito" onclick="navegarA('remito')">
+    <span class="nav-icon">🧾</span>
+    <span class="nav-label">Remito</span>
+  </button>
+  <button class="nav-btn" id="nav-editor" onclick="navegarA('editor')">
+    <span class="nav-icon">✏️</span>
+    <span class="nav-label">Editor</span>
+  </button>
+  <button class="nav-btn" id="nav-panel" onclick="navegarA('panel')">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Panel</span>
+  </button>
+</nav>
+
+<script type="module">
+import { getURL, setURL, toast } from './shared.js';
+import { montarRemito }  from './views/remito.js';
+import { montarEditor }  from './views/editor.js';
+import { montarPanel }   from './views/panel.js';
+
+// ── Módulos ya montados (evita re-montar en cada cambio de tab) ──
+const montados = { remito: false, editor: false, panel: false };
+
+const montadores = { remito: montarRemito, editor: montarEditor, panel: montarPanel };
+
+// ── Cargar URL guardada ──────────────────────────────────────────
+document.getElementById('sheet-url').value = getURL();
+actualizarDot();
+
+function actualizarDot() {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot' + (getURL() ? ' ok' : '');
+}
+
+window.guardarURL = function() {
+  const val = document.getElementById('sheet-url').value;
+  setURL(val);
+  actualizarDot();
+  toast('✅ URL guardada', 'ok');
+  // Forzar re-mount de la vista activa para que reconecte
+  const activa = document.querySelector('.vista.activa');
+  if (activa) {
+    const nombre = activa.id.replace('vista-', '');
+    montados[nombre] = false;
+    montar(nombre);
+  }
+};
+
+// ── Navegación ───────────────────────────────────────────────────
+window.navegarA = function(nombre) {
+  // Ocultar todas las vistas
+  document.querySelectorAll('.vista').forEach(v => v.classList.remove('activa'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
+
+  document.getElementById(`vista-${nombre}`).classList.add('activa');
+  document.getElementById(`nav-${nombre}`).classList.add('activo');
+
+  montar(nombre);
+  // Scroll al tope
+  document.getElementById('app').scrollTo(0, 0);
+};
+
+function montar(nombre) {
+  if (montados[nombre]) return;
+  const contenedor = document.getElementById(`vista-${nombre}`);
+  montadores[nombre](contenedor);
+  montados[nombre] = true;
+}
+
+// ── Montar vista inicial ─────────────────────────────────────────
+document.getElementById('loading').style.display = 'none';
+document.getElementById('vista-remito').classList.add('activa');
+montar('remito');
+
+// ── Service Worker ───────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
