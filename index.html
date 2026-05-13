@@ -141,13 +141,13 @@ const montados = { remito: false, editor: false, panel: false };
 const montadores = { remito: montarRemito, editor: montarEditor, panel: montarPanel };
 
 // ── Cargar URL guardada ──────────────────────────────────────────
-document.getElementById('sheet-url').value = getURL();
-actualizarDot();
-
 function actualizarDot() {
   const dot = document.getElementById('status-dot');
   dot.className = 'status-dot' + (getURL() ? ' ok' : '');
 }
+
+document.getElementById('sheet-url').value = getURL();
+actualizarDot();
 
 window.guardarURL = function() {
   const val = document.getElementById('sheet-url').value;
